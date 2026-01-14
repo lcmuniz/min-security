@@ -1,16 +1,15 @@
 package org.example.minsecurity;
 
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
 public class ApiController {
+
+    private final AuthService loginService = new AuthService();
 
     @GetMapping("/public")
     Map<String, String> publicEndpoint() {
@@ -18,36 +17,22 @@ public class ApiController {
     }
 
     @PostMapping("/login")
-    Map<String, String> login(@RequestBody Map<String, String> body) {
-        if ("admin".equals(body.get("username")) && "admin".equals(body.get("password"))) {
-
-            Collection<String> roles = List.of("ADMIN", "USER");
-
-            return Map.of(
-                    "accessToken", JwtUtil.accessToken("admin", roles),
-                    "refreshToken", JwtUtil.refreshToken("admin")
-            );
-        }
-        throw new RuntimeException("Invalid credentials");
+    Map<String, String> login(@RequestBody Map<String, String> body) throws InvalidCredentialsException {
+        return loginService.login(body.get("username"), body.get("password"));
     }
 
     @PostMapping("/refresh")
-    Map<String, String> refresh(@RequestBody Map<String, String> body) {
-        String refreshToken = body.get("refreshToken");
-        if (JwtUtil.isRefresh(refreshToken)) {
-            String username = JwtUtil.validate(refreshToken);
-            Collection<String> roles = List.of("ADMIN", "USER");
-            return Map.of("accessToken", JwtUtil.accessToken(username, roles));
-        }
-        throw new RuntimeException("Invalid refresh token");
+    Map<String, String> refresh(@RequestBody Map<String, String> body) throws InvalidRefreshTokenException {
+        return loginService.refresh(body.get("refreshToken"));
     }
 
     @GetMapping("/private")
     Map<String, Object> privateEndpoint(Authentication auth) {
+        User user = User.of(auth);
         return Map.of(
                 "message", "private endpoint",
-                "username", auth.getName(),
-                "roles", auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList()
+                "username", user.getName(),
+                "roles", user.getRoles()
         );
     }
 
